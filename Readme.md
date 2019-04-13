@@ -2,7 +2,7 @@
 
 ### Remissflöde på Huddinge sjukhus radiologen 2010-2019 (t.o.m 9/4 2019)
 
-Under `figures` hittar man grafik sammanställning av data.
+Under `figures` hittar man grafisk sammanställning av data.
 
 Under `selections` hittar man hur alla "önskad undersökning" texter hamnat i olika
 modalitets grupperingar med nuvarande filtrerings kriterierna. 
