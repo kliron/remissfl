@@ -11,9 +11,10 @@ from typing import Callable
 from collections import Counter
 
 
-work_dir = '/Users/kliron/Projects/remissfl'
+work_dir = './'
 selections_dir = os.path.join(work_dir, 'selections')
 figures_dir = os.path.join(work_dir, 'figures')
+xlsx_dir = os.path.join(work_dir, 'xlsx')
 dump = os.path.join(work_dir, 'rtg_huddinge_2010-2019.csv')
 
 print('Läser data från {}...'.format(dump))
@@ -211,9 +212,8 @@ for _s, _c in important:
 n_missed = 0
 for _m in missed:
     n_missed += _m[1]
-    print('\nMissat: "{}" ({} counts)'.format(_m[0], _m[1]))
 
-print('\nTotalt missade: {}/{} (i {} remisser)\nViktigast: "{}" hade {} counts'
+print('\nTotalt missade: {}/{} (i {} remisser)\nViktigast: "{}" med {} counts'
       .format(len(missed), most_common, n_missed, missed[0][0], missed[0][1]))
 
 
@@ -227,7 +227,7 @@ for _s, _n in zip([ul, nm, mr, dt, angio, glys, rtg], ['ul', 'nm', 'mr', 'dt', '
     save_selection_strings(_s, _n)
 
 
-print('\nAdderar modalitet och tids intervall.')
+print('\nLägger till modalitet och tidsintervall.')
 
 
 def get_modality(row: Series) -> str:
@@ -246,7 +246,7 @@ def get_modality(row: Series) -> str:
     elif row.undersokning in rtg:
         return 'Rtg'
     elif row.undersokning in granskning:
-        return 'Granksning'
+        return 'Granskning'
     else:
         return 'Annat'
 
@@ -445,16 +445,16 @@ _weekday2 = days[datetime.datetime(busiest_day_jourtid[0],
 print('\nMest belastad jour var {} {}/{} {} med {} akuta remisser besvarade 16:00 - 07:30'
       .format(_weekday1, busiest_day_jourtid[2], busiest_day_jourtid[1], busiest_day_jourtid[0], busiest_day_jourtid[3]))
 
-print('\nEn tyst stund till minnet av hjältarna som föll den ödesdigra dagen')
-
-
 _dagtid_by_month = _akuta_dagtid.groupby(['year', 'month']).size().reset_index(name='antal')
 _jourtid_by_month = _akuta_jourtid.groupby(['year', 'month']).size().reset_index(name='antal')
 _dagtid_by_weekday = _akuta_dagtid.groupby(['weekday', 'year']).size().reset_index(name='antal')
 _jourtid_by_weekday = _akuta_jourtid.groupby(['weekday', 'year']).size().reset_index(name='antal')
 
 _dagtid_by_month_and_weekday = _akuta_dagtid.groupby(['year', 'month', 'weekday']).size().reset_index(name='antal')
-_jourtid_by_month_weekday = _akuta_jourtid.groupby(['year', 'month', 'weekday']).size().reset_index(name='antal')
+_jourtid_by_month_and_weekday = _akuta_jourtid.groupby(['year', 'month', 'weekday']).size().reset_index(name='antal')
+
+_dagtid_by_month_and_weekday.to_excel(os.path.join(xlsx_dir, 'dagtid_per_månad_och_veckodag.xlsx'), index=False)
+_jourtid_by_month_and_weekday.to_excel(os.path.join(xlsx_dir, 'jourtid_per_månad_och_veckodag.xlsx'), index=False)
 
 
 #############################################################
@@ -473,18 +473,39 @@ olika_system = olika_system.assign(system=np.where(olika_system.bestallningstidp
 system_counts = olika_system.groupby(['system', 'datum', 'modalitet']).size().reset_index(name='antal')
 system_means = system_counts.groupby(['system', 'modalitet']).mean().add_prefix('medel_')
 
-system_counts.groupby(['system', 'modalitet']).describe()
-print(system_means)
+_w1 = pd.ExcelWriter(os.path.join(xlsx_dir, 'joursystem_nya_vs_gamla.xlsx'))
+system_counts.groupby(['system', 'modalitet']).describe().to_excel(_w1, startcol=0, startrow=3)
+ws1 = _w1.sheets['Sheet1']
+ws1.write_string(0, 0, 'Genomsnitt antal remisser i nya systemet (fr.o.m 2019-02-11) vs gamla')
+_w1.save()
 
 
 # Remove extreme (non-acute) records: keep only records where svar_mottogs is within 24h of bestallningtidpunkt
-deltas_dagtid = _akuta_dagtid.loc[
-    (_akuta_dagtid.svar_mottogs - _akuta_dagtid.bestallningstidpunkt) <= Timedelta('1 days 00:00:00'),
-    ['year', 'delta_t']]
+_dd = _akuta_dagtid.loc[
+    (_akuta_dagtid.svar_mottogs - _akuta_dagtid.bestallningstidpunkt) <= Timedelta('1 days 00:00:00')]
 
-deltas_jour = _akuta_jourtid.loc[
-    (_akuta_jourtid.svar_mottogs - _akuta_jourtid.bestallningstidpunkt) <= Timedelta('1 days 00:00:00'),
-    ['year', 'delta_t']]
+deltas_dagtid = _dd[['year', 'delta_t']]
+
+_dj = _akuta_jourtid.loc[
+    (_akuta_jourtid.svar_mottogs - _akuta_jourtid.bestallningstidpunkt) <= Timedelta('1 days 00:00:00')]
+
+deltas_jour = _dj[['year', 'delta_t']]
+
+_w2 = pd.ExcelWriter(os.path.join(xlsx_dir, 'tid_deltas_dagtid.xlsx'))
+_dd[['year', 'month', 'weekday', 'delta_t']].groupby(['year', 'month', 'weekday']).describe()\
+    .to_excel(_w2, startcol=0, startrow=3)
+ws2 = _w2.sheets['Sheet1']
+ws2.write_string(0, 0, 'Tid (i timmar) det tar för att svara på akuta remisser dagtid. '
+                       'Endast remisser besvarade inom 24 timmar räknas.')
+_w2.save()
+
+_w3 = pd.ExcelWriter(os.path.join(xlsx_dir, 'tid_deltas_jourtid.xlsx'))
+_dj[['year', 'month', 'weekday', 'delta_t']].groupby(['year', 'month', 'weekday']).describe() \
+    .to_excel(_w3, startcol=0, startrow=3)
+ws3 = _w3.sheets['Sheet1']
+ws3.write_string(0, 0, 'Tid (i timmar) det tar för att svara på akuta remisser jourtid. '
+                       'Endast remisser besvarade inom 24 timmar räknas.')
+_w3.save()
 
 
 #########
