@@ -7,7 +7,7 @@ import os
 import re
 import datetime
 import matplotlib.pyplot as plt
-from typing import Callable
+from typing import Callable, Collection
 from collections import Counter
 
 
@@ -170,7 +170,7 @@ glys = set(akuta[(akuta.undersokning.str.contains(glys_sel, case=False)) &
 
 exclude = '|'.join(['Utlån', 'EKG', 'Sekundärremiss', 'Remissgranskning', 'Pericardpunktion',
                     'Pacemakerinläggning', 'Hjärtkateterisering', 'Gastroskopi', 'Gastrointestinal transittid',
-                    'Ekg vila', 'Duodenoskopi',' Dialyskateter', 'CVP inläggning', 'CR - Demonstration',
+                    'Ekg vila', 'Duodenoskopi', ' Dialyskateter', 'CVP inläggning', 'CR - Demonstration',
                     'Bukaortaaneurysm beh', 'Bildlagring', 'Administrativ tjänst på Fysiologen', 'Kärl artär',
                     'Ledig rad', 'Narkosbokning', 'Endoskopi', 'Endoskopiskt ultraljud', '[CK]oloskopi'
                     'ERCP', 'Efterbearbetning', 'Bildtjänst', 'Provligga/Provåka i modalitet', 'Babygram',
@@ -328,65 +328,80 @@ counts_skapade = skapade.size().reset_index(name='antal')
 years = akuta.year.unique().tolist()
 years.sort()
 
-# Grand total under jourtid
+
+# Grand total, dagtid
+dag_alla_svarade = counts_alla_svarade[counts_alla_svarade.interval_svarad.isin([1, 2]) &
+                                       counts_alla_svarade.year.isin(years)] \
+    .groupby(['year']) \
+    .sum() \
+    .reset_index()[['year', 'antal']]
+
+dag_alla_skapade = counts_alla_skapade[counts_alla_skapade.interval_skapad.isin([1, 2]) &
+                                       counts_alla_skapade.year.isin(years)] \
+    .groupby(['year']) \
+    .sum() \
+    .reset_index()[['year', 'antal']]
+
+# Grand total, jourtid
 jour_alla_svarade = counts_alla_svarade[counts_alla_svarade.interval_svarad.isin([3, 4, 5]) &
                                         counts_alla_svarade.year.isin(years)]\
     .groupby(['year'])\
-    .sum()\
-    .reset_index()
+    .sum() \
+    .reset_index()[['year', 'antal']]
 
 jour_alla_skapade = counts_alla_skapade[counts_alla_skapade.interval_skapad.isin([3, 4, 5]) &
                                         counts_alla_skapade.year.isin(years)] \
     .groupby(['year']) \
     .sum() \
-    .reset_index()
+    .reset_index()[['year', 'antal']]
 
 sen_jour_alla_svarade = counts_alla_svarade[counts_alla_svarade.interval_svarad.isin([5]) &
                                             counts_alla_svarade.year.isin(years)] \
     .groupby(['year']) \
     .sum() \
-    .reset_index()
+    .reset_index()[['year', 'antal']]
 
 sen_jour_alla_skapade = counts_alla_skapade[counts_alla_skapade.interval_skapad.isin([5]) &
                                             counts_alla_skapade.year.isin(years)] \
     .groupby(['year']) \
     .sum() \
-    .reset_index()
+    .reset_index()[['year', 'antal']]
 
+# Per modalitet
 jour_svarade = counts_svarade[counts_svarade.interval_svarad.isin([3, 4, 5]) &
                               counts_svarade.year.isin(years) &
                               counts_svarade.modalitet.isin(['DT', 'Rtg', 'Glys', 'Ulj'])]\
     .groupby(['year', 'modalitet'])\
-    .sum()\
-    .reset_index()
+    .sum() \
+    .reset_index()[['year', 'modalitet', 'antal']]
 
 jour_skapade = counts_skapade[counts_skapade.interval_skapad.isin([3, 4, 5]) &
                               counts_skapade.year.isin(years) &
                               counts_skapade.modalitet.isin(['DT', 'Rtg', 'Glys', 'Ulj'])]\
     .groupby(['year', 'modalitet'])\
-    .sum()\
-    .reset_index()
+    .sum() \
+    .reset_index()[['year', 'modalitet', 'antal']]
 
 sen_jour_svarade = counts_svarade[counts_svarade.interval_svarad.isin([5]) &
                                   counts_svarade.year.isin(years) &
                                   counts_svarade.modalitet.isin(['DT', 'Rtg', 'Glys', 'Ulj'])] \
     .groupby(['year', 'modalitet']) \
     .sum() \
-    .reset_index()
+    .reset_index()[['year', 'modalitet', 'antal']]
 
 sen_jour_skapade = counts_skapade[counts_skapade.interval_skapad.isin([5]) &
                                   counts_skapade.year.isin(years) &
                                   counts_skapade.modalitet.isin(['DT', 'Rtg', 'Glys', 'Ulj'])] \
     .groupby(['year', 'modalitet']) \
     .sum() \
-    .reset_index()
+    .reset_index()[['year', 'modalitet', 'antal']]
 
 ej_jour_skapade = counts_skapade[counts_skapade.interval_skapad.isin([1, 2]) &
                                  counts_skapade.year.isin(years) &
                                  counts_skapade.modalitet.isin(['DT', 'Rtg', 'Glys', 'Ulj'])]\
     .groupby(['year', 'modalitet'])\
-    .sum()\
-    .reset_index()
+    .sum() \
+    .reset_index()[['year', 'modalitet', 'antal']]
 
 
 ##################################################
@@ -402,59 +417,71 @@ def date_to_str(row: Series) -> str:
 days = ('Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön')
 months = ('Jan', 'Feb', 'Mar', 'Apr', 'Maj', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec')
 
-_akuta_dagtid = akuta[akuta.interval_svarad.isin([1, 2])]
-_akuta_jourtid = akuta[akuta.interval_svarad.isin([3, 4, 5])]
+#
+#
+# ----------------------- ALLA SELEKTIONER AVSER **AKUTA** REMISSER FRÅN OCH MED NU ------------------------------- #
+#
+# Prefix _b -> 'besvarade'
+# Prefix _s -> 'skapade'
+#
+_b_dag = akuta[akuta.interval_svarad.isin([1, 2])]
+_b_jour = akuta[akuta.interval_svarad.isin([3, 4, 5])]
+_s_dag = akuta[akuta.interval_skapad.isin([1, 2])]
+_s_jour = akuta[akuta.interval_skapad.isin([3, 4, 5])]
 
-_dagtid_by_month_and_day = _akuta_dagtid.groupby(['year', 'month', 'day']).size().reset_index(name='antal')
-_jourtid_by_month_and_day = _akuta_jourtid.groupby(['year', 'month', 'day']).size().reset_index(name='antal')
+_b_dag_by_month_and_day = _b_dag.groupby(['year', 'month', 'day']) \
+    .size().reset_index(name='antal')
 
-busiest_month_dagtid = _dagtid_by_month_and_day.loc[_dagtid_by_month_and_day.antal == _dagtid_by_month_and_day.antal.max(),
-                                 ['year', 'month', 'antal']]\
-    .values.tolist()[0]
+_b_jour_by_month_and_day = _b_jour.groupby(['year', 'month', 'day']) \
+    .size().reset_index(name='antal')
+
+busiest_month_dag = _b_dag_by_month_and_day.loc[
+    _b_dag_by_month_and_day.antal == _b_dag_by_month_and_day.antal.max(),
+    ['year', 'month', 'antal']].values.tolist()[0]
 
 print('\nMest belastad månad dagtid var {} {} med {} akuta remisser besvarade 07:30 - 16:00'
-      .format(months[int(busiest_month_dagtid[1])], busiest_month_dagtid[0], busiest_month_dagtid[2]))
+      .format(months[int(busiest_month_dag[1])], busiest_month_dag[0], busiest_month_dag[2]))
 
-busiest_month_jourtid = _jourtid_by_month_and_day.loc[_jourtid_by_month_and_day.antal == _jourtid_by_month_and_day.antal.max(),
-                                                      ['year', 'month', 'antal']] \
-    .values.tolist()[0]
+busiest_month_jour = _b_jour_by_month_and_day.loc[
+    _b_jour_by_month_and_day.antal == _b_jour_by_month_and_day.antal.max(),
+    ['year', 'month', 'antal']].values.tolist()[0]
 
 print('\nMest belastad månad jourtid var {} {} med {} akuta remisser besvarade 16:00 - 07:30'
-      .format(months[int(busiest_month_jourtid[1])], busiest_month_jourtid[0], busiest_month_jourtid[2]))
+      .format(months[int(busiest_month_jour[1])], busiest_month_jour[0], busiest_month_jour[2]))
 
 
-busiest_day_dagtid = _dagtid_by_month_and_day.loc[_dagtid_by_month_and_day.antal == _dagtid_by_month_and_day.antal.max(),
-                                                  ['year', 'month', 'day', 'antal']] \
-    .values.tolist()[0]
+busiest_day_dag = _b_dag_by_month_and_day \
+    .loc[_b_dag_by_month_and_day.antal == _b_dag_by_month_and_day.antal.max(),
+         ['year', 'month', 'day', 'antal']].values.tolist()[0]
 
-_weekday1 = days[datetime.datetime(busiest_day_dagtid[0],
-                                   busiest_day_dagtid[1],
-                                   busiest_day_dagtid[2]).weekday()]
+_weekday1 = days[datetime.datetime(busiest_day_dag[0],
+                                   busiest_day_dag[1],
+                                   busiest_day_dag[2]).weekday()]
 
 print('\nMest belastad dag var {} {}/{} {} med {} akuta remisser besvarade 07:30 - 16:00'
-      .format(_weekday1, busiest_day_dagtid[2], busiest_day_dagtid[1], busiest_day_dagtid[0], busiest_day_dagtid[3]))
+      .format(_weekday1, busiest_day_dag[2], busiest_day_dag[1], busiest_day_dag[0], busiest_day_dag[3]))
 
-busiest_day_jourtid = _jourtid_by_month_and_day.loc[_jourtid_by_month_and_day.antal == _jourtid_by_month_and_day.antal.max(),
-                                                  ['year', 'month', 'day', 'antal']] \
-    .values.tolist()[0]
+busiest_day_jour = _b_jour_by_month_and_day.loc[
+    _b_jour_by_month_and_day.antal == _b_jour_by_month_and_day.antal.max(),
+    ['year', 'month', 'day', 'antal']].values.tolist()[0]
 
-_weekday2 = days[datetime.datetime(busiest_day_jourtid[0],
-                                   busiest_day_jourtid[1],
-                                   busiest_day_jourtid[2]).weekday()]
+_weekday2 = days[datetime.datetime(busiest_day_jour[0], busiest_day_jour[1], busiest_day_jour[2]).weekday()]
 
-print('\nMest belastad jour var {} {}/{} {} med {} akuta remisser besvarade 16:00 - 07:30'
-      .format(_weekday1, busiest_day_jourtid[2], busiest_day_jourtid[1], busiest_day_jourtid[0], busiest_day_jourtid[3]))
+print('\nMest belastad jour var {} {}/{} {} med {} akuta remisser besvarade 16:00 - 07:30'.format(
+    _weekday1,
+    busiest_day_jour[2],
+    busiest_day_jour[1],
+    busiest_day_jour[0],
+    busiest_day_jour[3]))
 
-_dagtid_by_month = _akuta_dagtid.groupby(['year', 'month']).size().reset_index(name='antal')
-_jourtid_by_month = _akuta_jourtid.groupby(['year', 'month']).size().reset_index(name='antal')
-_dagtid_by_weekday = _akuta_dagtid.groupby(['weekday', 'year']).size().reset_index(name='antal')
-_jourtid_by_weekday = _akuta_jourtid.groupby(['weekday', 'year']).size().reset_index(name='antal')
-
-_dagtid_by_month_and_weekday = _akuta_dagtid.groupby(['year', 'month', 'weekday']).size().reset_index(name='antal')
-_jourtid_by_month_and_weekday = _akuta_jourtid.groupby(['year', 'month', 'weekday']).size().reset_index(name='antal')
-
-_dagtid_by_month_and_weekday.to_excel(os.path.join(xlsx_dir, 'dagtid_per_månad_och_veckodag.xlsx'), index=False)
-_jourtid_by_month_and_weekday.to_excel(os.path.join(xlsx_dir, 'jourtid_per_månad_och_veckodag.xlsx'), index=False)
+_b_dag_by_month = _b_dag.groupby(['year', 'month']).size().reset_index(name='antal')
+_b_jour_by_month = _b_jour.groupby(['year', 'month']).size().reset_index(name='antal')
+_dag_by_weekday = _b_dag.groupby(['weekday', 'year']).size().reset_index(name='antal')
+_b_jour_by_weekday = _b_jour.groupby(['weekday', 'year']).size().reset_index(name='antal')
+_b_dag_by_month_and_weekday = _b_dag.groupby(['year', 'month', 'weekday']).size().reset_index(name='antal')
+_b_jour_by_month_and_weekday = _b_jour.groupby(['year', 'month', 'weekday']).size().reset_index(name='antal')
+_b_dag_by_month_and_weekday.to_excel(os.path.join(xlsx_dir, 'dagtid_per_månad_och_veckodag.xlsx'), index=False)
+_b_jour_by_month_and_weekday.to_excel(os.path.join(xlsx_dir, 'jourtid_per_månad_och_veckodag.xlsx'), index=False)
 
 
 #############################################################
@@ -467,8 +494,9 @@ olika_system = akuta[akuta.year.isin([2018, 2019]) &
                      (akuta.interval_skapad == 5) &
                      akuta.modalitet.isin(['DT', 'Rtg', 'Glys', 'Ulj'])]
 
-olika_system = olika_system.assign(system=np.where(olika_system.bestallningstidpunkt < datetime.datetime(2019, 2, 11), 0, 1),
-                                   datum=olika_system.apply(date_to_str, axis=1))
+olika_system = olika_system \
+    .assign(system=np.where(olika_system.bestallningstidpunkt < datetime.datetime(2019, 2, 11), 0, 1),
+            datum=olika_system.apply(date_to_str, axis=1))
 
 system_counts = olika_system.groupby(['system', 'datum', 'modalitet']).size().reset_index(name='antal')
 system_means = system_counts.groupby(['system', 'modalitet']).mean().add_prefix('medel_')
@@ -476,42 +504,63 @@ system_means = system_counts.groupby(['system', 'modalitet']).mean().add_prefix(
 _w1 = pd.ExcelWriter(os.path.join(xlsx_dir, 'joursystem_nya_vs_gamla.xlsx'))
 system_counts.groupby(['system', 'modalitet']).describe().to_excel(_w1, startcol=0, startrow=3)
 ws1 = _w1.sheets['Sheet1']
-ws1.write_string(0, 0, 'Genomsnitt antal remisser i nya systemet (fr.o.m 2019-02-11) vs gamla')
+ws1.write_string(0, 0, 'Genomsnitt antal remisser i nya systemet fr.o.m 2019-02-11 (= 1) vs gamla (= 0)')
 _w1.save()
 
+# Remove extreme (not really acute) records: keep only records where svar_mottogs is within 24h of bestallningtidpunkt
+_dd = _b_dag.loc[(_b_dag.svar_mottogs - _b_dag.bestallningstidpunkt) <= Timedelta('1 days 00:00:00')]
 
-# Remove extreme (non-acute) records: keep only records where svar_mottogs is within 24h of bestallningtidpunkt
-_dd = _akuta_dagtid.loc[
-    (_akuta_dagtid.svar_mottogs - _akuta_dagtid.bestallningstidpunkt) <= Timedelta('1 days 00:00:00')]
+deltas_dag = _dd[['year', 'delta_t']]
 
-deltas_dagtid = _dd[['year', 'delta_t']]
-
-_dj = _akuta_jourtid.loc[
-    (_akuta_jourtid.svar_mottogs - _akuta_jourtid.bestallningstidpunkt) <= Timedelta('1 days 00:00:00')]
+_dj = _b_jour.loc[(_b_jour.svar_mottogs - _b_jour.bestallningstidpunkt) <= Timedelta('1 days 00:00:00')]
 
 deltas_jour = _dj[['year', 'delta_t']]
 
-_w2 = pd.ExcelWriter(os.path.join(xlsx_dir, 'tid_deltas_dagtid.xlsx'))
-_dd[['year', 'month', 'weekday', 'delta_t']].groupby(['year', 'month', 'weekday']).describe()\
-    .to_excel(_w2, startcol=0, startrow=3)
+_w2 = pd.ExcelWriter(os.path.join(xlsx_dir, 'tid_deltas_dag.xlsx'))
+_dd[['year', 'month', 'weekday', 'delta_t']].groupby(['year', 'month', 'weekday']).describe().to_excel(_w2,
+                                                                                                       startcol=0,
+                                                                                                       startrow=3)
 ws2 = _w2.sheets['Sheet1']
 ws2.write_string(0, 0, 'Tid (i timmar) det tar för att svara på akuta remisser dagtid. '
                        'Endast remisser besvarade inom 24 timmar räknas.')
 _w2.save()
 
-_w3 = pd.ExcelWriter(os.path.join(xlsx_dir, 'tid_deltas_jourtid.xlsx'))
-_dj[['year', 'month', 'weekday', 'delta_t']].groupby(['year', 'month', 'weekday']).describe() \
-    .to_excel(_w3, startcol=0, startrow=3)
+_w3 = pd.ExcelWriter(os.path.join(xlsx_dir, 'tid_deltas_jour.xlsx'))
+_dj[['year', 'month', 'weekday', 'delta_t']].groupby(['year', 'month', 'weekday']).describe().to_excel(_w3,
+                                                                                                       startcol=0,
+                                                                                                       startrow=3)
 ws3 = _w3.sheets['Sheet1']
 ws3.write_string(0, 0, 'Tid (i timmar) det tar för att svara på akuta remisser jourtid. '
                        'Endast remisser besvarade inom 24 timmar räknas.')
 _w3.save()
 
 
+##############################################################
+# Jämför endast tillgängliga månader i 2019 (januari - mars) #
+##############################################################
+
+_jan_mar_b_dag = akuta[akuta.interval_svarad.isin([1, 2]) & akuta.month.isin([1, 2, 3])] \
+    .groupby(['year', 'month']).size().reset_index(name='antal')
+
+_jan_mar_b_jour = akuta[akuta.interval_svarad.isin([3, 4, 5]) & akuta.month.isin([1, 2, 3])] \
+    .groupby(['year', 'month']).size().reset_index(name='antal')
+
+_jan_mar_b_sen_jour = akuta[(akuta.interval_svarad == 5) & akuta.month.isin([1, 2, 3])] \
+    .groupby(['year', 'month']).size().reset_index(name='antal')
+
+_jan_mar_s_dag = akuta[akuta.interval_skapad.isin([1, 2]) & akuta.month.isin([1, 2, 3])] \
+    .groupby(['year', 'month']).size().reset_index(name='antal')
+
+_jan_mar_s_jour = akuta[akuta.interval_skapad.isin([3, 4, 5]) & akuta.month.isin([1, 2, 3])] \
+    .groupby(['year', 'month']).size().reset_index(name='antal')
+
+_jan_mar_s_sen_jour = akuta[(akuta.interval_skapad == 5) & akuta.month.isin([1, 2, 3])] \
+    .groupby(['year', 'month']).size().reset_index(name='antal')
+
+
 #########
 # Plots #
 #########
-
 
 def per_year_counts_barplot(dfm: DataFrame, title: str):
     ind = np.arange(len(years))
@@ -557,10 +606,10 @@ def per_year_modality_counts_barplot(dfm: DataFrame, title: str):
     ax.set_ylim(0, ymax + ymax*0.3)  # Set y limit higher so that labels don't overlap legend
 
     # Make the bar plot rectangles
-    dt_rects = ax.bar(ind - bar_width/2, mdt, bar_width, label='DT')
-    rtg_rects = ax.bar(ind + bar_width/2, mrtg, bar_width, label='Rtg')
-    ulj_rects = ax.bar(ind + (bar_width/2)*3, mulj, bar_width, label='Ulj')
-    glys_rects = ax.bar(ind + bar_width*2.5, mglys, bar_width, label='Glys')
+    ax.bar(ind - bar_width/2, mdt, bar_width, label='DT')
+    ax.bar(ind + bar_width/2, mrtg, bar_width, label='Rtg')
+    ax.bar(ind + (bar_width/2)*3, mulj, bar_width, label='Ulj')
+    ax.bar(ind + bar_width*2.5, mglys, bar_width, label='Glys')
 
     ax.legend(ncol=4)
 
@@ -578,7 +627,7 @@ def per_year_modality_counts_barplot(dfm: DataFrame, title: str):
 def counts_per_month_boxplot(df: DataFrame, title: str):
     values = [df[df['month'] == m]['antal'].values for m in range(1, 13)]
     fig, ax = plt.subplots()
-    plt.boxplot(values)
+    plt.boxplot(values, showfliers=True)
     ax.set_xticklabels(months)
     ax.set_xlabel('Månad')
     ax.set_ylabel('Antal')
@@ -589,7 +638,7 @@ def counts_per_month_boxplot(df: DataFrame, title: str):
 def counts_per_weekday_boxplot(df: DataFrame, title: str):
     values = [df[df['weekday'] == m]['antal'].values for m in range(0, 7)]
     fig, ax = plt.subplots()
-    plt.boxplot(values)
+    plt.boxplot(values, showfliers=True)
     ax.set_xticklabels(days)
     ax.set_xlabel('Veckodag')
     ax.set_ylabel('Antal')
@@ -600,7 +649,7 @@ def counts_per_weekday_boxplot(df: DataFrame, title: str):
 def timedelta_boxplot(df: DataFrame, title: str):
     values = [df[df['year'] == y]['delta_t'].values for y in years]
     fig, ax = plt.subplots()
-    plt.boxplot(values)
+    plt.boxplot(values, showfliers=True)
     ax.set_xticklabels(years)
     ax.set_xlabel('År')
     ax.set_ylabel('Timmar')
@@ -612,6 +661,8 @@ print('\nPlotting results...')
 
 plt.style.use('seaborn')
 
+per_year_counts_barplot(dag_alla_skapade, 'Akuta remisser skapade 07.30 - 16.00 (alla modaliteter)')
+per_year_counts_barplot(dag_alla_svarade, 'Akuta remisser besvarade 07.30 - 16.00 (alla modaliteter)')
 per_year_counts_barplot(jour_alla_skapade, 'Akuta remisser skapade 16.00 - 07.30 (alla modaliteter)')
 per_year_counts_barplot(jour_alla_svarade, 'Akuta remisser besvarade 16.00 - 07.30 (alla modaliteter)')
 per_year_counts_barplot(sen_jour_alla_skapade, 'Akuta remisser skapade 00.00 - 07.30 (alla modaliteter)')
@@ -621,11 +672,9 @@ per_year_modality_counts_barplot(jour_svarade, 'Akuta remisser besvarade 16.00 -
 per_year_modality_counts_barplot(sen_jour_skapade, 'Akuta remisser skapade 00.00 - 07.30')
 per_year_modality_counts_barplot(sen_jour_svarade, 'Akuta remisser besvarade 00.00 - 07.30')
 per_year_modality_counts_barplot(ej_jour_skapade, 'Akuta remisser skapade 07.30 - 16.00')
-counts_per_month_boxplot(_dagtid_by_month, title='Akuta besvarade remisser per månad, dagtid')
-counts_per_month_boxplot(_jourtid_by_month, title='Akuta besvarade remisser per månad, jour')
-counts_per_weekday_boxplot(_dagtid_by_weekday, title='Akuta besvarade remisser per veckodag, dagtid')
-counts_per_weekday_boxplot(_jourtid_by_weekday, title='Akuta besvarade remisser per veckodag, jour')
-timedelta_boxplot(deltas_dagtid, 'Tidsinterval, akuta remisser besvarade inom 24t, dagtid')
+counts_per_month_boxplot(_b_dag_by_month, title='Akuta besvarade remisser per månad, dag')
+counts_per_month_boxplot(_b_jour_by_month, title='Akuta besvarade remisser per månad, jour')
+counts_per_weekday_boxplot(_dag_by_weekday, title='Akuta besvarade remisser per veckodag, dag')
+counts_per_weekday_boxplot(_b_jour_by_weekday, title='Akuta besvarade remisser per veckodag, jour')
+timedelta_boxplot(deltas_dag, 'Tidsinterval, akuta remisser besvarade inom 24t, dag')
 timedelta_boxplot(deltas_jour, 'Tidsinterval, akuta remisser besvarade inom 24t, jour')
-
-
