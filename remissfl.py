@@ -665,16 +665,22 @@ def timedelta_boxplot(df: DataFrame, title: str):
     plt.savefig(os.path.join(figures_dir, '{}.png'.format(title)), dpi=600)
 
 
-def counts_per_month_and_year_heatmap(df: DataFrame, title: str):
+missing_months_2019 = 8
+
+
+def counts_per_month_and_year_heatmap(data: Series, normalize_by: Series = None, title: str = ""):
     plt.style.use('seaborn-dark')
-    # Fill in missing months (may-dec) in 2019
-    missing = [{'year': 2019, 'month': m, 'antal': 0} for m in range(5, 13)]
-    dfm = df.append(missing, ignore_index=True)
-    # Normalize
-    mu = dfm['antal'].mean()
-    sd = dfm['antal'].std()
-    normalized = dfm['antal'].apply(lambda v: (v - mu)/sd).round(decimals=2)
-    m = normalized.values.reshape(10, 12)
+    if normalize_by is None:
+        # normalize by mean and std
+        mu = np.repeat(data.mean(), data.size)
+        sd = np.repeat(data.std(), data.size)
+        normalized = (data - mu) / sd
+        normalized[-missing_months_2019:] = 0
+    else:
+        normalized = data / normalize_by
+        normalized[-missing_months_2019:] = 0
+
+    m = normalized.values.round(decimals=2).reshape(10, 12)
 
     colors = [(0.3, 0.3, 1.), (0.3, 1., 1.), (0.3, 1., 0.3), (1., 1., 0.3), (1., 0.3, 0.3)]  # rgb
     cm = LinearSegmentedColormap.from_list('my_colormap', colors)
@@ -718,13 +724,30 @@ per_year_modality_counts_barplot(jour_svarade, 'Akuta remisser besvarade 16.00 -
 per_year_modality_counts_barplot(sen_jour_skapade, 'Akuta remisser skapade 00.00 - 07.30')
 per_year_modality_counts_barplot(sen_jour_svarade, 'Akuta remisser besvarade 00.00 - 07.30')
 per_year_modality_counts_barplot(ej_jour_skapade, 'Akuta remisser skapade 07.30 - 16.00')
-counts_per_month_boxplot(_b_dag_by_month, title='Akuta besvarade remisser per månad, dag')
-counts_per_month_boxplot(_b_jour_by_month, title='Akuta besvarade remisser per månad, jour')
-counts_per_weekday_boxplot(_b_dag_by_weekday, title='Akuta besvarade remisser per veckodag, dag')
-counts_per_weekday_boxplot(_b_jour_by_weekday, title='Akuta besvarade remisser per veckodag, jour')
+counts_per_month_boxplot(_b_dag_by_month, 'Akuta besvarade remisser per månad, dag')
+counts_per_month_boxplot(_b_jour_by_month, 'Akuta besvarade remisser per månad, jour')
+counts_per_weekday_boxplot(_b_dag_by_weekday, 'Akuta besvarade remisser per veckodag, dag')
+counts_per_weekday_boxplot(_b_jour_by_weekday, 'Akuta besvarade remisser per veckodag, jour')
 timedelta_boxplot(deltas_dag, 'Tidsinterval, akuta remisser besvarade inom 24t, dag')
 timedelta_boxplot(deltas_jour, 'Tidsinterval, akuta remisser besvarade inom 24t, jour')
-counts_per_month_and_year_heatmap(_b_dag_by_month, 'Normaliserat antal besvarade remisser per månad och år, dag')
-counts_per_month_and_year_heatmap(_b_jour_by_month, 'Normaliserat antal besvarade remisser per månad och år, jour')
-counts_per_month_and_year_heatmap(_s_dag_by_month, 'Normaliserat antal skapade remisser per månad och år, dag')
-counts_per_month_and_year_heatmap(_s_jour_by_month, 'Normaliserat antal skapade remisser per månad och år, jour')
+
+
+# Fill in missing months (may-dec) in 2019
+missing = [{'year': 2019, 'month': m, 'antal': 0.00000001} for m in range(5, 13)]
+_b_dag_by_month_filled = _b_dag_by_month.append(missing, ignore_index=True)
+_b_jour_by_month_filled = _b_jour_by_month.append(missing, ignore_index=True)
+
+_s_dag_by_month_filled = _s_dag_by_month.append(missing, ignore_index=True)
+_s_jour_by_month_filled = _s_jour_by_month.append(missing, ignore_index=True)
+
+counts_per_month_and_year_heatmap(_b_dag_by_month_filled['antal'],
+                                  title='Normaliserat antal akuta besvarade remisser per månad och år, dag')
+counts_per_month_and_year_heatmap(_b_jour_by_month_filled['antal'],
+                                  title='Normaliserat antal akuta besvarade remisser per månad och år, jour')
+counts_per_month_and_year_heatmap(_s_dag_by_month_filled['antal'],
+                                  title='Normaliserat antal akuta skapade remisser per månad och år, dag')
+counts_per_month_and_year_heatmap(_s_jour_by_month_filled['antal'],
+                                  title='Normaliserat antal akuta skapade remisser per månad och år, jour')
+counts_per_month_and_year_heatmap(_b_jour_by_month_filled['antal'],
+                                  normalize_by=_s_jour_by_month_filled['antal'],
+                                  title='Antal besvarade remisser normalizerat med antal skapade i samma period, jour')

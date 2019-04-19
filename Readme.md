@@ -11,3 +11,9 @@ avsevärt (som jag vet om).
 3. Under `xlsx` hittar man deskriptiv statistik för vissa observationer i excel format.
 
 
+OBS:
+
+1. Alla siffror avser endast *akuta* remisser.
+2. Heatmaps visar variation mellan grupper efter data har antingen normalizerats som Z-values
+(subtraherat genomsnitt och delat med SD) eller delat antal besvarade remisser med 
+antal skapade remisser i samma period. Vilken normalisering som gäller framgår av titeln. 
