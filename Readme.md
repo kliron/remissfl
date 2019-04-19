@@ -1,5 +1,3 @@
-## OBS: WORK IN PROGRESS
-
 ### Remissflöde på Huddinge sjukhus radiologen 2010-2019 (t.o.m 9/4 2019)
 
 1. Under `figures` hittar man grafisk sammanställning av data.
