@@ -6,8 +6,9 @@ import numpy as np
 import os
 import re
 import datetime
+from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
-from typing import Callable, Collection
+from typing import Callable
 from collections import Counter
 
 
@@ -476,13 +477,16 @@ print('\nMest belastad jour var {} {}/{} {} med {} akuta remisser besvarade 16:0
 
 _b_dag_by_month = _b_dag.groupby(['year', 'month']).size().reset_index(name='antal')
 _b_jour_by_month = _b_jour.groupby(['year', 'month']).size().reset_index(name='antal')
-_dag_by_weekday = _b_dag.groupby(['weekday', 'year']).size().reset_index(name='antal')
+_b_dag_by_weekday = _b_dag.groupby(['weekday', 'year']).size().reset_index(name='antal')
 _b_jour_by_weekday = _b_jour.groupby(['weekday', 'year']).size().reset_index(name='antal')
 _b_dag_by_month_and_weekday = _b_dag.groupby(['year', 'month', 'weekday']).size().reset_index(name='antal')
 _b_jour_by_month_and_weekday = _b_jour.groupby(['year', 'month', 'weekday']).size().reset_index(name='antal')
 _b_dag_by_month_and_weekday.to_excel(os.path.join(xlsx_dir, 'dagtid_per_månad_och_veckodag.xlsx'), index=False)
 _b_jour_by_month_and_weekday.to_excel(os.path.join(xlsx_dir, 'jourtid_per_månad_och_veckodag.xlsx'), index=False)
 
+
+_s_dag_by_month = _s_dag.groupby(['year', 'month']).size().reset_index(name='antal')
+_s_jour_by_month = _s_jour.groupby(['year', 'month']).size().reset_index(name='antal')
 
 #############################################################
 # Olika joursystem. Datum nya systemet infördes: 2019-02-11 #
@@ -563,6 +567,7 @@ _jan_mar_s_sen_jour = akuta[(akuta.interval_skapad == 5) & akuta.month.isin([1, 
 #########
 
 def per_year_counts_barplot(dfm: DataFrame, title: str):
+    plt.style.use('seaborn')
     ind = np.arange(len(years))
     bar_width = 0.32
     fig, ax = plt.subplots()
@@ -574,8 +579,7 @@ def per_year_counts_barplot(dfm: DataFrame, title: str):
     ymax = dfm.antal.max()
     ax.set_ylim(0, ymax + ymax*0.2)  # Set y limit higher so that labels don't overlap legend
 
-    # Make the bar plot rectangles
-    rects = ax.bar(ind - bar_width/2, dfm['antal'], bar_width)
+    ax.bar(ind - bar_width/2, dfm['antal'], bar_width)
 
     # Add counts
     for rect in ax.patches:
@@ -589,6 +593,7 @@ def per_year_counts_barplot(dfm: DataFrame, title: str):
 
 
 def per_year_modality_counts_barplot(dfm: DataFrame, title: str):
+    plt.style.use('seaborn')
     mdt = dfm[dfm.modalitet == 'DT'].antal.values
     mrtg = dfm[dfm.modalitet == 'Rtg'].antal.values
     mulj = dfm[dfm.modalitet == 'Ulj'].antal.values
@@ -625,6 +630,7 @@ def per_year_modality_counts_barplot(dfm: DataFrame, title: str):
 
 
 def counts_per_month_boxplot(df: DataFrame, title: str):
+    plt.style.use('seaborn')
     values = [df[df['month'] == m]['antal'].values for m in range(1, 13)]
     fig, ax = plt.subplots()
     plt.boxplot(values, showfliers=True)
@@ -636,6 +642,7 @@ def counts_per_month_boxplot(df: DataFrame, title: str):
 
 
 def counts_per_weekday_boxplot(df: DataFrame, title: str):
+    plt.style.use('seaborn')
     values = [df[df['weekday'] == m]['antal'].values for m in range(0, 7)]
     fig, ax = plt.subplots()
     plt.boxplot(values, showfliers=True)
@@ -647,6 +654,7 @@ def counts_per_weekday_boxplot(df: DataFrame, title: str):
 
 
 def timedelta_boxplot(df: DataFrame, title: str):
+    plt.style.use('seaborn')
     values = [df[df['year'] == y]['delta_t'].values for y in years]
     fig, ax = plt.subplots()
     plt.boxplot(values, showfliers=True)
@@ -657,9 +665,47 @@ def timedelta_boxplot(df: DataFrame, title: str):
     plt.savefig(os.path.join(figures_dir, '{}.png'.format(title)), dpi=600)
 
 
-print('\nPlotting results...')
+def counts_per_month_and_year_heatmap(df: DataFrame, title: str):
+    plt.style.use('seaborn-dark')
+    # Fill in missing months (may-dec) in 2019
+    missing = [{'year': 2019, 'month': m, 'antal': 0} for m in range(5, 13)]
+    dfm = df.append(missing, ignore_index=True)
+    # Normalize
+    mu = dfm['antal'].mean()
+    sd = dfm['antal'].std()
+    normalized = dfm['antal'].apply(lambda v: (v - mu)/sd).round(decimals=2)
+    m = normalized.values.reshape(10, 12)
 
-plt.style.use('seaborn')
+    colors = [(0.3, 0.3, 1.), (0.3, 1., 1.), (0.3, 1., 0.3), (1., 1., 0.3), (1., 0.3, 0.3)]  # rgb
+    cm = LinearSegmentedColormap.from_list('my_colormap', colors)
+    threshold = m.max()
+    fig, ax = plt.subplots()
+    h = ax.imshow(m, interpolation='nearest', vmax=threshold, cmap=cm)
+    ax.set_xticks(np.arange(len(months)))
+    ax.set_yticks(np.arange(len(years)))
+    ax.set_xticklabels(months)
+    ax.set_yticklabels(years)
+
+    # Rotate and align tick labels.
+    plt.setp(ax.get_xticklabels(), rotation=45, ha='right', rotation_mode='anchor')
+
+    # Text annotations.
+    for i in range(len(years)):
+        for j in range(len(months)):
+            ax.text(j, i, m[i, j], ha='center', va='center', color='black')
+
+    # Show colorbar
+    values_range = [m.min(), 0.00, m.max()]
+    cbar = plt.colorbar(h)
+    cbar.set_ticks(values_range)
+    cbar.set_ticklabels(values_range)
+
+    ax.set_title(title)
+    fig.tight_layout()
+    plt.savefig(os.path.join(figures_dir, '{}.png'.format(title)), dpi=600)
+
+
+print('\nPlotting results...')
 
 per_year_counts_barplot(dag_alla_skapade, 'Akuta remisser skapade 07.30 - 16.00 (alla modaliteter)')
 per_year_counts_barplot(dag_alla_svarade, 'Akuta remisser besvarade 07.30 - 16.00 (alla modaliteter)')
@@ -674,7 +720,11 @@ per_year_modality_counts_barplot(sen_jour_svarade, 'Akuta remisser besvarade 00.
 per_year_modality_counts_barplot(ej_jour_skapade, 'Akuta remisser skapade 07.30 - 16.00')
 counts_per_month_boxplot(_b_dag_by_month, title='Akuta besvarade remisser per månad, dag')
 counts_per_month_boxplot(_b_jour_by_month, title='Akuta besvarade remisser per månad, jour')
-counts_per_weekday_boxplot(_dag_by_weekday, title='Akuta besvarade remisser per veckodag, dag')
+counts_per_weekday_boxplot(_b_dag_by_weekday, title='Akuta besvarade remisser per veckodag, dag')
 counts_per_weekday_boxplot(_b_jour_by_weekday, title='Akuta besvarade remisser per veckodag, jour')
 timedelta_boxplot(deltas_dag, 'Tidsinterval, akuta remisser besvarade inom 24t, dag')
 timedelta_boxplot(deltas_jour, 'Tidsinterval, akuta remisser besvarade inom 24t, jour')
+counts_per_month_and_year_heatmap(_b_dag_by_month, 'Normaliserat antal besvarade remisser per månad och år, dag')
+counts_per_month_and_year_heatmap(_b_jour_by_month, 'Normaliserat antal besvarade remisser per månad och år, jour')
+counts_per_month_and_year_heatmap(_s_dag_by_month, 'Normaliserat antal skapade remisser per månad och år, dag')
+counts_per_month_and_year_heatmap(_s_jour_by_month, 'Normaliserat antal skapade remisser per månad och år, jour')
